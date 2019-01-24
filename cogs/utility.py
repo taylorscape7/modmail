@@ -23,22 +23,18 @@ class Utility:
 
     def format_cog_help(self, ctx, cog):
         """Formats the text for a cog help"""
-        sigs = []
+        maxlen = 0
         prefix = self.bot.prefix
-
         for cmd in self.bot.commands:
             if cmd.hidden:
                 continue
             if cmd.instance is cog:
-                sigs.append(len(cmd.qualified_name) + len(prefix))
-                if hasattr(cmd, 'all_commands'):
-                    for c in cmd.all_commands.values():
-                        sigs.append(len('\u200b  └─ ' + c.name) + 1)
+                len_ = len(cmd.qualified_name) + len(prefix)
+                if len_ > maxlen:
+                    maxlen = len_
 
-        if not sigs:
+        if maxlen == 0:
             return
-
-        maxlen = max(sigs)
 
         fmt = ['']
         index = 0
@@ -51,21 +47,10 @@ class Utility:
                     fmt.append('')
                 fmt[index] += f'`{prefix+cmd.qualified_name:<{maxlen}}` - '
                 fmt[index] += f'{cmd.short_doc:<{maxlen}}\n'
-                if hasattr(cmd, 'commands'):
-                    for i, c in enumerate(cmd.commands):
-                        if len(cmd.commands) == i + 1:  # last
-                            branch = '\u200b  └─ ' + c.name
-                        else:
-                            branch = '\u200b  ├─ ' + c.name
-                        if len(fmt[index] + f"`{branch:<{maxlen+1}}` - " + f"{c.short_doc:<{maxlen}}\n") > 1024:
-                            index += 1
-                            fmt.append('')
-                        fmt[index] += f"`{branch:<{maxlen+1}}` - "
-                        fmt[index] += f"{c.short_doc:<{maxlen}}\n"
 
         em = discord.Embed(
             description='*' + inspect.getdoc(cog) + '*',
-            color=discord.Colour.green()
+            color=discord.Colour.blurple()
         )
         em.set_author(name=cog.__class__.__name__ + ' - Help', icon_url=ctx.bot.user.avatar_url)
 
@@ -75,14 +60,14 @@ class Utility:
             else:
                 em.add_field(name=u'\u200b', value=i)
 
-        em.set_footer(text=f'Type {prefix}command for more info on a command.')
+        em.set_footer(text=f'Type "{prefix}help command" for more info on a command.')
         return em
 
     def format_command_help(self, ctx, cmd):
         """Formats command help."""
         prefix = self.bot.prefix
         em = discord.Embed(
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=cmd.help
         )
 
@@ -106,7 +91,7 @@ class Utility:
             fmt += f"{c.short_doc:<{maxlen}}\n"
 
         em.add_field(name='Subcommands', value=fmt)
-        em.set_footer(text=f'Type {prefix}help {cmd} command for more info on a command.')
+        em.set_footer(text=f'Type "{prefix}help {cmd} command" for more info on a command.')
 
         return em
 
@@ -115,7 +100,7 @@ class Utility:
         em = discord.Embed()
         em.title = 'Could not find a cog or command by that name.'
         em.color = discord.Color.red()
-        em.set_footer(text=f'Type {prefix}help to get a full list of commands.')
+        em.set_footer(text=f'Type "{prefix}help" to get a full list of commands.')
         cogs = get_close_matches(command, self.bot.cogs.keys())
         cmds = get_close_matches(command, self.bot.all_commands.keys())
         if cogs or cmds:
@@ -127,10 +112,9 @@ class Utility:
         return em
 
     @commands.command()
+    @trigger_typing
     async def help(self, ctx, *, command: str=None):
         """Shows the help message."""
-
-        await ctx.trigger_typing()
 
         if command is not None:
             cog = self.bot.cogs.get(command)
@@ -167,7 +151,7 @@ class Utility:
     @trigger_typing
     async def about(self, ctx):
         """Shows information about the bot."""
-        em = discord.Embed(color=0x36393F, timestamp=datetime.datetime.utcnow())
+        em = discord.Embed(color=discord.Color.blurple(), timestamp=datetime.datetime.utcnow())
         em.set_author(name='Modmail - About', icon_url=self.bot.user.avatar_url)
         em.set_thumbnail(url=self.bot.user.avatar_url)
 
@@ -218,7 +202,7 @@ class Utility:
         em = discord.Embed(
             title='Github',
             description='Current User',
-            color=discord.Color.green()
+            color=discord.Color.blurple()
         )
         user = data['user']
         em.set_author(name=user['username'], icon_url=user['avatar_url'], url=user['url'])
@@ -236,7 +220,7 @@ class Utility:
         em = discord.Embed(
             title='Already up to date',
             description=f'The latest version is [`{self.bot.version}`](https://github.com/kyb3r/modmail/blob/master/bot.py#L25)',
-            color=discord.Color.green()
+            color=discord.Color.blurple()
         )
 
         if metadata['latest_version'] == self.bot.version:
@@ -286,7 +270,7 @@ class Utility:
             await self.bot.config.update()
             em = discord.Embed(
                 title='Activity Removed',
-                color=discord.Color.green()
+                color=discord.Color.blurple()
             )
             return await ctx.send(embed=em)
 
@@ -308,7 +292,7 @@ class Utility:
         em = discord.Embed(
             title='Activity Changed',
             description=f'Current activity is: {activity_type.name} {message}.',
-            color=discord.Color.green()
+            color=discord.Color.blurple()
         )
         return await ctx.send(embed=em)
 
@@ -330,7 +314,7 @@ class Utility:
         current = self.bot.config.get('mention', '@here')
         em = discord.Embed(
             title='Current text',
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=f'{current}'
         )
 
@@ -351,7 +335,7 @@ class Utility:
         current = self.bot.prefix
         em = discord.Embed(
             title='Current prefix',
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=f'{current}'
         )
 
@@ -376,7 +360,7 @@ class Utility:
     async def options(self, ctx):
         """Return a list of valid config keys you can change."""
         valid = ', '.join(f'`{k}`' for k in self.bot.config.allowed_to_change_in_command)
-        em = discord.Embed(title='Valid Keys', description=valid, color=discord.Color.green())
+        em = discord.Embed(title='Valid Keys', description=valid, color=discord.Color.blurple())
         await ctx.send(embed=em)
 
     @config.command(name='set')
@@ -387,13 +371,13 @@ class Utility:
 
         em = discord.Embed(
             title='Success',
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=f'Set `{key}` to `{value}`'
         )
 
         if key not in self.bot.config.allowed_to_change_in_command:
             em.title = 'Error'
-            em.color = discord.Color.green()
+            em.color = discord.Color.blurple()
             em.description = f'{key} is an invalid key.'
             valid_keys = [f'`{k}`' for k in self.bot.config.allowed_to_change_in_command]
             em.add_field(name='Valid keys', value=', '.join(valid_keys))
@@ -404,16 +388,16 @@ class Utility:
 
     @config.command(name='del')
     async def _del(self, ctx, key: str.lower):
-        """Sets a specified key from the config to nothing."""
+        """Deletes a key from the config."""
         em = discord.Embed(
             title='Success',
-            color=discord.Color.green(),
-            description=f'Set `{key}` to nothing.'
+            color=discord.Color.blurple(),
+            description=f'`{key}` had been deleted from the config.'
         )
 
         if key not in self.bot.config.allowed_to_change_in_command:
             em.title = 'Error'
-            em.color = discord.Color.green()
+            em.color = discord.Color.blurple()
             em.description = f'{key} is an invalid key.'
             valid_keys = [f'`{k}`' for k in self.bot.config.allowed_to_change_in_command]
             em.add_field(name='Valid keys', value=', '.join(valid_keys))
@@ -426,12 +410,12 @@ class Utility:
     @config.command(name='get')
     async def get(self, ctx, key=None):
         """Shows the config variables that are currently set."""
-        em = discord.Embed(color=discord.Color.green())
+        em = discord.Embed(color=discord.Color.blurple())
         em.set_author(name='Current config', icon_url=self.bot.user.avatar_url)
 
         if key and key not in self.bot.config.allowed_to_change_in_command:
             em.title = 'Error'
-            em.color = discord.Color.green()
+            em.color = discord.Color.blurple()
             em.description = f'`{key}` is an invalid key.'
             valid_keys = [f'`{k}`' for k in self.bot.config.allowed_to_change_in_command]
             em.add_field(name='Valid keys', value=', '.join(valid_keys))
@@ -460,7 +444,7 @@ class Utility:
 
         embeds = []
 
-        em = discord.Embed(color=discord.Color.green())
+        em = discord.Embed(color=discord.Color.blurple())
         em.set_author(name='Command aliases', icon_url=ctx.guild.icon_url)
 
         embeds.append(em)
@@ -474,7 +458,7 @@ class Utility:
 
         for name, value in self.bot.aliases.items():
             if len(em.fields) == 5:
-                em = discord.Embed(color=discord.Color.green(), description=em.description)
+                em = discord.Embed(color=discord.Color.blurple(), description=em.description)
                 em.set_author(name='Command aliases', icon_url=ctx.guild.icon_url)
                 em.set_footer(text=f'Do {self.bot.prefix}help aliases for more commands.')
                 embeds.append(em)
@@ -500,7 +484,7 @@ class Utility:
 
         em = discord.Embed(
             title='Added alias',
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=f'`{name}` points to: {value}'
         )
 
@@ -515,7 +499,7 @@ class Utility:
 
         em = discord.Embed(
             title='Removed alias',
-            color=discord.Color.green(),
+            color=discord.Color.blurple(),
             description=f'`{name}` no longer exists.'
         )
 
