@@ -1,13 +1,18 @@
+import logging
 import secrets
 from datetime import datetime
 from json import JSONDecodeError
 from typing import Union, Optional
 
-from aiohttp import ClientResponseError, ClientResponse
 from discord import Member, DMChannel
 from discord.ext import commands
 
+from aiohttp import ClientResponseError, ClientResponse
+
 from core.models import Bot, UserClient
+from core.utils import info
+
+logger = logging.getLogger('Modmail')
 
 
 class ApiClient:
@@ -242,7 +247,7 @@ class GitHub(ApiClient):
         self.username: str = resp['login']
         self.avatar_url: str = resp['avatar_url']
         self.url: str = resp['html_url']
-        print(f'Logged in to: {self.username}')
+        logger.info(info(f'GitHub logged in to: {self.username}'))
         return self
 
 
@@ -452,9 +457,17 @@ class SelfHostedClient(UserClient, ApiClient):
         return conf
 
     async def update_config(self, data):
-        data = self.filter_valid(data)
-        return await self.db.config.update_one({'bot_id': self.bot.user.id},
-                                               {'$set': data})
+        valid_keys = self.bot.config.valid_keys.difference(
+            self.bot.config.protected_keys
+        )
+
+        toset = {k: v for k, v in data.items() if k in valid_keys}
+        unset = {k: 1 for k in valid_keys if k not in data}
+
+        return await self.db.config.update_one(
+            {'bot_id': self.bot.user.id},
+            {'$set': toset, '$unset': unset}
+            )
 
     async def edit_message(self, message_id, new_content):
         await self.logs.update_one({
@@ -525,3 +538,12 @@ class SelfHostedClient(UserClient, ApiClient):
                 'url': user.url
             }
         }
+
+
+class PluginDatabaseClient:
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    def get_partition(self, cog):
+        cls_name = cog.__class__.__name__
+        return self.bot.db.plugins[cls_name]

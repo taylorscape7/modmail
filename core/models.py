@@ -3,10 +3,11 @@ import asyncio
 import typing
 from datetime import datetime
 
-from aiohttp import ClientSession
 from discord import Color, Member, User, CategoryChannel, DMChannel, Embed
 from discord import Message, TextChannel, Guild
 from discord.ext import commands
+
+from aiohttp import ClientSession
 from motor.motor_asyncio import AsyncIOMotorClient
 
 
@@ -14,6 +15,7 @@ class Bot(abc.ABC, commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.start_time = datetime.utcnow()
+        self._connected = asyncio.Event()
 
     @property
     def uptime(self) -> str:
@@ -242,8 +244,8 @@ class ConfigManagerABC(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def clean_data(self, key: str,
-                   val: typing.Any) -> typing.Tuple[str, str]:
+    async def clean_data(self, key: str,
+                         val: typing.Any) -> typing.Tuple[str, str]:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -379,9 +381,9 @@ class ThreadManagerABC(abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def create(self, recipient: typing.Union[Member, User], *,
-                     creator: typing.Union[Member, User] = None,
-                     category: CategoryChannel = None) -> 'ThreadABC':
+    def create(self, recipient: typing.Union[Member, User], *,
+               creator: typing.Union[Member, User] = None,
+               category: CategoryChannel = None) -> 'ThreadABC':
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -392,8 +394,8 @@ class ThreadManagerABC(abc.ABC):
 
 
 class InvalidConfigError(commands.BadArgument):
-    def __init__(self, msg):
-        super().__init__(msg)
+    def __init__(self, msg, *args):
+        super().__init__(msg, *args)
         self.msg = msg
 
     @property

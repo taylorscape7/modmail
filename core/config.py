@@ -2,8 +2,13 @@ import asyncio
 import json
 import os
 
+import isodate
+
+from discord.ext.commands import BadArgument
+
 from core._color_data import ALL_COLORS
 from core.models import Bot, ConfigManagerABC, InvalidConfigError
+from core.time import UserFriendlyTime
 
 
 class ConfigManager(ConfigManagerABC):
@@ -13,43 +18,46 @@ class ConfigManager(ConfigManagerABC):
         'twitch_url',
         # bot settings
         'main_category_id', 'disable_autoupdates', 'prefix', 'mention',
-        'main_color',
+        'main_color', 'user_typing', 'mod_typing', 'account_age',
         # logging
         'log_channel_id',
         # threads
         'sent_emoji', 'blocked_emoji', 'thread_creation_response',
         # moderation
-        'recipient_color', 'mod_tag', 'mod_color'
+        'recipient_color', 'mod_tag', 'mod_color',
         # anonymous message
         'anon_username', 'anon_avatar_url', 'anon_tag'
     }
 
     internal_keys = {
-        # activity
-        'activity_message', 'activity_type',
+        # bot presence
+        'activity_message', 'activity_type', 'status',
         # moderation
         'blocked',
         # threads
         'snippets', 'notification_squad', 'subscriptions', 'closures',
-        # commands
-        'aliases'
+        # misc
+        'aliases', 'plugins'
     }
 
     protected_keys = {
         # Modmail
         'modmail_api_token', 'modmail_guild_id', 'guild_id', 'owners',
-        # logs
-        'log_url',
-        # database
-        'mongo_uri',
+        'log_url', 'mongo_uri',
         # bot
         'token',
         # GitHub
-        'github_access_token'
+        'github_access_token',
+        # Logging
+        'log_level'
     }
 
     colors = {
         'mod_color', 'recipient_color', 'main_color'
+    }
+
+    time_deltas = {
+        'account_age'
     }
 
     valid_keys = allowed_to_change_in_command | internal_keys | protected_keys
@@ -82,11 +90,13 @@ class ConfigManager(ConfigManagerABC):
     def populate_cache(self):
         data = {
             'snippets': {},
+            'plugins': [],
             'aliases': {},
             'blocked': {},
             'notification_squad': {},
             'subscriptions': {},
             'closures': {},
+            'log_level': 'INFO'
         }
 
         data.update(os.environ)
@@ -102,7 +112,7 @@ class ConfigManager(ConfigManagerABC):
         }
         return self.cache
 
-    def clean_data(self, key, val):
+    async def clean_data(self, key, val):
         value_text = val
         clean_value = val
 
@@ -125,6 +135,25 @@ class ConfigManager(ConfigManagerABC):
                 value_text = clean_value
             else:
                 clean_value = hex_
+                value_text = f'{val} ({clean_value})'
+
+        elif key in self.time_deltas:
+            try:
+                isodate.parse_duration(val)
+            except isodate.ISO8601Error:
+                try:
+                    converter = UserFriendlyTime()
+                    time = await converter.convert(None, val)
+                    if time.arg:
+                        raise ValueError
+                except BadArgument as e:
+                    raise InvalidConfigError(*e.args)
+                except Exception:
+                    raise InvalidConfigError(
+                        'Unrecognized time, please use ISO-8601 duration format '
+                        'string or a simpler "human readable" time.'
+                    )
+                clean_value = isodate.duration_isoformat(time.dt - converter.now)
                 value_text = f'{val} ({clean_value})'
 
         return clean_value, value_text
